@@ -5,8 +5,17 @@
 #include <string>
 #include <vector>
 
+#ifdef _WIN32
 #include <tchar.h>
 #include <windows.h>
+#define COLORS 16
+#endif
+
+#ifdef unix
+#include <ncurses.h>
+#include <unistd.h>
+#define COLORS 8
+#endif
 
 const int ROW = 7;
 const int COL = 13;
@@ -16,6 +25,13 @@ using namespace std;
 using ASCII_CHAR = vector<vector<int>>;
 
 map<int, int (*)[2]> Coordinate;
+
+#ifdef _WIN32
+#define sleep(n) Sleep(n)
+#define print(s) (cout<<s)
+
+void refresh()
+{}
 
 void goto_xy(short x, short y)
 {
@@ -28,13 +44,16 @@ void goto_xy(short x, short y)
 void set_color(unsigned short ForeColor = 7, unsigned short BackGroundColor = 0)
 {
   HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
-  SetConsoleTextAttribute(handle,
-                          ForeColor + BackGroundColor * 0x10);   
+  SetConsoleTextAttribute(handle, ForeColor + BackGroundColor * 0x10);
 }
 
 void move_window()
 {
-  LPWSTR title;
+#if defined(_MSC_VER)
+	char title[100];
+#elif defined(__GNUC__)
+  LPSTR title;
+#endif
   HWND   hwnd;
   GetConsoleTitle(title, 100);
   hwnd = FindWindow(NULL, title);
@@ -45,10 +64,56 @@ void hide_cur()
 {
   HANDLE              handle = GetStdHandle(STD_OUTPUT_HANDLE);
   CONSOLE_CURSOR_INFO CursorInfo;
-  GetConsoleCursorInfo(handle, &CursorInfo);   
-  CursorInfo.bVisible = false;                 
-  SetConsoleCursorInfo(handle, &CursorInfo);   
+  GetConsoleCursorInfo(handle, &CursorInfo);
+  CursorInfo.bVisible = false;
+  SetConsoleCursorInfo(handle, &CursorInfo);
 }
+
+void init()
+{
+  move_window();
+  system("cls");
+  system("title Loading...");
+  system("mode con cols=96");
+  system("mode con lines=32");
+}
+#endif
+
+#ifdef unix
+#define sleep(n) usleep(n*1000)
+#define print(s) printw(s)
+void goto_xy(short x, short y)
+{
+  move(x, y);
+}
+
+void set_color(unsigned short ForeColor = 7, unsigned short BackGroundColor = 0)
+{
+  attron(COLOR_PAIR(ForeColor));
+}
+
+void hide_cur()
+{
+  curs_set(0);
+}
+
+void init()
+{
+  initscr();
+  noecho();
+  cbreak();
+  start_color();
+  init_pair(1, COLOR_BLUE, COLOR_BLACK);
+  init_pair(2, COLOR_GREEN, COLOR_BLACK);
+  init_pair(3, COLOR_CYAN, COLOR_BLACK);
+  init_pair(4, COLOR_MAGENTA, COLOR_BLACK);
+  init_pair(5, COLOR_YELLOW, COLOR_BLACK);
+  init_pair(6, COLOR_RED, COLOR_BLACK);
+  init_pair(7, COLOR_WHITE, COLOR_BLACK);
+  //init_pair(8, COLOR_WHITE, COLOR_BLACK);
+}
+#endif
+
 ASCII_CHAR LetterA      = {{0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0},
                       {0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0},
                       {0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0},
@@ -165,13 +230,14 @@ void draw_left_to_right(int x, int y, ASCII_CHAR l, bool twinking = false,
         if (twinking) {
           set_color(color);
         } else {
-          Sleep(30);
+          sleep(30);
         }
-        cout << "*";
+        print("*");
         set_color();
       } else {
-        cout << " ";
+        print(" ");
       }
+      refresh();
     }
   }
 }
@@ -185,12 +251,13 @@ void draw_up_to_down(int x, int y, ASCII_CHAR l, bool twinking = false,
         if (twinking) {
           set_color(color);
         } else {
-          Sleep(40);
+          sleep(40);
         }
-        cout << "*";
+        print("*");
         set_color();
       } else
-        cout << " ";
+        print(" ");
+      refresh();
     }
   }
 }
@@ -202,12 +269,7 @@ int main(int arc, const char **argv)
    *      13  10  10 10  5  9  9  5   10   5  9  10   2
    *
    */
-
-  move_window();
-  system("cls");
-  system("title Loading...");
-  system("mode con cols=96");
-  system("mode con lines=32");
+  init();
   srand(time(0));
   // getchar();
   // Sleep(5000);
@@ -237,14 +299,18 @@ int main(int arc, const char **argv)
   draw_left_to_right(20, 84, LetterY);        // Y
 
   hide_cur();
+  #ifdef _WIN32
   system("title Happy ~");
+  #endif
   while (true) {
     for (int i = 0; i < 17; ++i) {
-      int color = rand() % 16;
+      int color = rand() % COLORS;
       draw_left_to_right((*Coordinate[i])[0], (*Coordinate[i])[1], orders[i],
                          true, color);
     }
   }
+  #ifdef _WIN32
   cout << endl;
+  #endif
   return 0;
 }
